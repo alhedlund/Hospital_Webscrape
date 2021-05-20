@@ -1,32 +1,14 @@
 import pandas as pd
+import logging
 from sqlalchemy import create_engine
-from hospital_dict import hospital_dict
-from multi_use_data_pulls import single_file_pull, multiple_file_pull
-from functions import convert_xlsx_to_csv
-import sql
-import DataFrameTools as dft
-hospital_data = []
+from utils import functions
+from utils import sql
+from constants import hospital_dict as h
+from data_acquisition import hospital_object as hosp_obj
+from logging import DEBUG
 
-
-def get_files_from_fac_id(facility_id: str):
-    global hospital_data
-    """
-    Takes a facility id string and executes function to pull files from website
-    :param facility_id:
-    :return:
-    """
-    for i in hospital_dict:
-        if i['facId'] == facility_id:
-            filenames = i['filenames']
-            url = i['url']
-            if filenames[0][-4:] == '.csv':
-                if len(filenames) > 1:
-                    multiple_file_pull(file_names=filenames, url=url)
-                else:
-                    single_file_pull(file_name=filenames, url=url)
-                hospital_data.append(i['facId'])
-                hospital_data.append(i['hospital'])
-                return filenames
+logger = logging.getLogger(__name__)
+logger.setLevel(level=DEBUG)
 
 
 def recursive_col_elimination(dataframe, filename, k=0):
@@ -48,16 +30,17 @@ def recursive_col_elimination(dataframe, filename, k=0):
     return dataframe
 
 
-def write_raw_csv_to_table(dataframe: pd.DataFrame, hospital, year: str):
-    global hospital_data
+def write_raw_csv_to_table(dataframe: pd.DataFrame, fac_id: str, hospital_name: str, year: str):
     """
     Takes a dataframe and writes contents to a table with the specified name.
     This should be executed after columns are cleaned up in recursive_col_elimination function.
-    :param dataframe: dataframe with correct columns
-    :param hospital: Name of mysql table data will go in to
+    :param dataframe: Dataframe with correct columns
+    :param fac_id: String containing facility_id field
+    :param hospital_name: String containing hospital_name field
+    :param year: Year file is relevant to
     """
     column_names = []
-    table_name = str(hospital[0]) + '_' + str(hospital[1]).replace(' ', '_') + '_' + year
+    table_name = str(fac_id) + '_' + str(hospital_name).replace(' ', '_') + '_' + year
     for item in dataframe.columns:
         item = item.replace(" ", "_")
         column_names.append(item + ' VARCHAR(255)')
@@ -67,17 +50,12 @@ def write_raw_csv_to_table(dataframe: pd.DataFrame, hospital, year: str):
                         {}
                         )
                         '''.format(table_name, column_names)
-    print(create_table_sql)
-    print(table_name)
 
     engine = create_engine(
         'mysql+pymysql://admin:Clearwater123!@MySQL-database-1.cmx12ym6czg5.us-west-2.rds.amazonaws.com/dbo')
 
-    # Todo: Add programmatic table creation here as well
     sql.sql_commit(create_table_sql)
     dataframe.to_sql(name=table_name, con=engine, if_exists='replace')
-    hospital_data.clear()
-    print(hospital_data)
 
 
 def basic_norm_function(dataframe):
@@ -85,15 +63,13 @@ def basic_norm_function(dataframe):
     Takes a dataframe with correct columns and extracts common columns of interest via regex, returning a
     normed dataframe.
     :param dataframe: dataframe with columns of interest at 0th index
-    :param filename: name of file being read
     :return normed_df: dataframe with only common columns
     """
-    # Todo: Decide columns we want to keep across all files to formalize this list of terms
     normed_col_list = ['.*HCPCS.*', '.*CPT.*', '.*Code.*', '.*Description.*', '.*Charge.*', '.*Price.*', '.*Cost.*']
     new_cols = []
 
-    for i in normed_col_list:
-        df_subset_contains = dataframe.filter(regex=i, axis=1)
+    for col_name in normed_col_list:
+        df_subset_contains = dataframe.filter(regex=col_name, axis=1)
         new_cols.append(list(df_subset_contains.columns))
 
     normed_df = dataframe[set(column for i in new_cols for column in i)]
@@ -107,30 +83,34 @@ def basic_norm_function(dataframe):
 # runs functions for example
 # csv test: 100242
 # xlsx test: 50512
-fac_id_filenames = get_files_from_fac_id('131312')
 
-print(fac_id_filenames)
-for filename in fac_id_filenames:
-    print(filename)
+# Testing the class
+for i in h.hospital_dict:
+    hosp_one = hosp_obj.Hospital(i['facId'], i['filenames'], i['hospital'], i['url'])
+    hosp_one.get_files()
 
-    if filename.count('.xlsx') >= 1:
-        csv_file, csv_filename = convert_xlsx_to_csv(filename)
+    for file in hosp_one.filenames:
+        if file[-5:].count('.xlsx') >= 1:
+            csv_file, csv_filename = functions.convert_xlsx_to_csv(file)
 
-        df = pd.read_csv(filepath_or_buffer=csv_filename)
-        cor_df = recursive_col_elimination(dataframe=df, filename=csv_filename)
+            df = pd.read_csv(filepath_or_buffer=csv_filename)
+            cor_df = recursive_col_elimination(dataframe=df, filename=csv_filename)
 
-        print(df.columns)
-        print(cor_df.columns)
+            print(df.columns)
+            print(cor_df.columns)
 
-        normed_dataframe = basic_norm_function(cor_df)
-        write_raw_csv_to_table(normed_dataframe, hospital_data, '2020')
+            normed_dataframe = basic_norm_function(cor_df)
+            # write_raw_csv_to_table(normed_dataframe, hosp_one.fac_id, hosp_one.hospital_name, '2020')
 
-    elif filename.count('.csv') >= 1:
-        df = pd.read_csv(filepath_or_buffer=filename, engine='python')
-        cor_df = recursive_col_elimination(dataframe=df, filename=filename)
+        elif file[-4:].count('.csv') >= 1:
+            df = pd.read_csv(filepath_or_buffer=file, engine='python')
+            cor_df = recursive_col_elimination(dataframe=df, filename=file)
 
-        print(df.columns)
-        print(cor_df.columns)
+            print(df.columns)
+            print(cor_df.columns)
 
-        normed_dataframe = basic_norm_function(cor_df)
-        write_raw_csv_to_table(normed_dataframe, hospital_data, '2020')
+            normed_dataframe = basic_norm_function(cor_df)
+            print(normed_dataframe)
+            write_raw_csv_to_table(normed_dataframe, hosp_one.fac_id, hosp_one.hospital_name, '2020')
+        quit()
+

@@ -1,20 +1,17 @@
+import csv
 import logging
 import pandas as pd
 from logging import DEBUG
-import requests as r
-import csv
-from pprint import pprint as p
-import numpy as np
-from utils import DataFrameTools as dft
-from constants import hospital_dict as h
-from fuzzywuzzy import fuzz, process
+
+logger = logging.getLogger(__name__)
+logger.setLevel(level=DEBUG)
 
 
 def clean_str(x):
     """
-
-    :param x:
-    :return:
+    Takes a string, removed special characters and returns a clean string.
+    :param x: String
+    :return: Clean string
     """
     x2 = x.lower()
     x2 = x2.replace('.', ''). \
@@ -29,9 +26,9 @@ def clean_str(x):
 
 def convert_xlsx_to_csv(filename):
     """
-
-    :param filename:
-    :return:
+    Takes the filename of an xlsx file and converts it to a csv file.
+    :param filename: String representation of the filename.
+    :return: csv version of xlsx file
     """
     df = pd.DataFrame()
     read_file = pd.ExcelFile(filename, engine='openpyxl')
@@ -44,9 +41,9 @@ def convert_xlsx_to_csv(filename):
 
 def csv_to_dict(filename):
     """
-
-    :param filename:
-    :return:
+    Takes the filename of a csv file and converts it into a dictionary object.
+    :param filename: String representation of the filename.
+    :return: Dictionary object
     """
     result = []
     with open(filename, mode='r') as file:
@@ -54,25 +51,3 @@ def csv_to_dict(filename):
         for line in reader:
             result.append(line)
     return result
-
-
-def get_hospital_fac_ids(hospital_dict, hospital_data):
-    """
-
-    :param hospital_dict:
-    :param hospital_data:
-    :return:
-    """
-    hospital_name = []
-    similarity = []
-    count = 0
-    for i in hospital_dict['hospital']:
-        ratio = process.extract(i, hospital_data['Facility Name'], limit=1)
-        hospital_name.append(ratio[0][0])
-        similarity.append(ratio[0][1])
-        count += 1
-        print(count)
-    hospital_dict['hospital_name'] = pd.Series(hospital_name)
-    hospital_dict['similarity'] = pd.Series(similarity)
-    return pd.to_pickle(hospital_dict, 'hospital_matches')
-

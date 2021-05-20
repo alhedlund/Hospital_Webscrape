@@ -1,3 +1,7 @@
+"""
+Some hospitals have several tabs or different formatting from the bulk of others.
+These functions pull and output data specifically for them.
+"""
 import logging
 import pandas as pd
 from logging import DEBUG
@@ -10,7 +14,7 @@ logger.setLevel(level=DEBUG)
 
 def saint_alphonsus():
     """
-
+    Pulls data for Saint Alphonsus hospitals and returns more workable output.
     :return:
     """
     types = ['oregon-idaho-shoppable.xlsx',
@@ -30,7 +34,7 @@ def saint_alphonsus():
 
 def st_lukes(url: str, filename: str):
     """
-
+     Pulls data for St. Luke's hospitals and returns more workable output.
     :param url:
     :param filename:
     :return:

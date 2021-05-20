@@ -2,8 +2,12 @@ import MySQLdb
 import os
 import pandas as pd
 import datetime as dt
-from utils import DataFrameTools as dft
+import logging
 from dotenv import load_dotenv
+from logging import DEBUG
+
+logger = logging.getLogger(__name__)
+logger.setLevel(level=DEBUG)
 
 load_dotenv()
 
@@ -18,15 +22,16 @@ sql = 'select * from dbo.hospital_data'
 
 def sql_results_to_df(sql, db, host, port=port, chunk=None, user=username, password=password):
     """
-
-    :param sql:
+    Takes a SQL query, executes the query in the specified database, returns the results of the query, and formats
+    those results into a Pandas dataframe.
+    :param sql: SQL query
     :param db:
     :param host:
     :param port:
     :param chunk:
     :param user:
     :param password:
-    :return:
+    :return: Dataframe with SQL results
     """
     t1 = dt.datetime.now()
     with MySQLdb.connect(
@@ -51,7 +56,7 @@ def sql_results_to_df(sql, db, host, port=port, chunk=None, user=username, passw
 
 def sql_commit(sql=None, db=db, host=host, port=port, chunk=None, user=username, password=password):
     """
-
+    Takes SQL credentials and executes a SQL command in specified table.
     :param sql:
     :param db:
     :param host:
@@ -59,7 +64,6 @@ def sql_commit(sql=None, db=db, host=host, port=port, chunk=None, user=username,
     :param chunk:
     :param user:
     :param password:
-    :return:
     """
     with MySQLdb.connect(
         host=host,
